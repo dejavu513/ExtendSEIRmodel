@@ -1,0 +1,313 @@
+---
+title: "simlation mcmc"
+author: "jun"
+date: "08/05/2022"
+output: html_document
+---
+###Initialization
+```{r}
+h=1
+T= 100#181 #172 
+N= 500 #60482200 #5364500  #60482200
+t.star = 30#14#132 #30 #70
+S = numeric(T)
+E = numeric(T)
+I = numeric(T)
+B = numeric(T)
+C = B
+D = B
+S[1] = N-1#S = N-1 ##s0
+E[1] = 1#E = 1 ###e0
+I[1] =0#I = 0 ##a
+beta = 0.4#0.2# prior rgamma(1, shape = 2, rate = 10 )
+q = 0.05  #0.2# prior rgamma(1, shape = 2, rate = 10 )
+rou = 1/5.5 #1/5.5 ##prior rgamma(1, shape = 2, rate = 14 )
+gamma = 0.014 #1/7 ## prior rgamma(1, shape = 2, rate = 10 )
+beta.t = numeric(T)
+#b0= 1 ### 57
+#B[1] = 1 #
+```
+
+###HK
+```{r}
+T= 114-70+1
+N = 7589499
+S = numeric(T)
+E = numeric(T)
+I = numeric(T)
+B = numeric(T)
+C = B
+D = B
+E[1] = 4337 #E = 1 ###e0
+I[1] = 274337
+S[1] = N-I[1]-E[1]#S = N-1 ##s0
+beta = 0.334
+q=0.132
+rou = 1/5.5
+gamma = 0.005
+```
+
+
+###simulate epidemic(set T version)
+```{r}
+beta.t[1] = beta
+prob.b = 1 - exp(-beta.t[1]*h*(I[1]+E[1])/N)
+prob.c = 1 - exp(-rou*h)
+prob.d = 1 - exp(-gamma*h)
+#B[1] <- 1
+B[1] <- rbinom(1,size = S[1], prob = prob.b)
+C[1] <- rbinom(1,size = E[1], prob = prob.c)
+D[1] <- rbinom(1,size = I[1], prob = prob.d)
+
+#set.seed(71)
+
+for (t in 2:T) {
+  S[t] = S[t-1] - B[t-1]
+  E[t] = E[t-1] + B[t-1] - C[t-1]
+  I[t] = I[t-1] + C[t-1]- D[t-1]
+  
+  if (t<t.star){
+    beta.t[t] = beta
+  }  
+  else{
+    beta.t[t] = beta*exp(-q*(t-t.star))
+  }
+  
+  prob.b = 1 - exp(-beta.t[t]*h*(I[t]+E[t])/N)
+  prob.c = 1 - exp(-rou*h)
+  prob.d = 1 - exp(-gamma*h)
+  B[t] = rbinom(1,size = S[t], prob = prob.b)
+  C[t] = rbinom(1,size = E[t], prob = prob.c)
+  D[t] = rbinom(1,size = I[t], prob = prob.d)
+}
+
+T= which(I+E==0)[1]
+B.true = B[1:T]
+E.true = E[1:T]
+S.true = S[1:T]
+I.true = I[1:T]
+C.true = C[1:T]
+D.true = D[1:T]
+beta.t.true = beta.t[1:T]
+
+B = B.true
+E = E.true
+S = S.true
+I = I.true
+C = C.true
+D = D.true
+
+m = sum(B)
+m
+
+
+```
+
+
+
+
+
+###another version
+```{r}
+prob.b = 1 - exp(-beta*h*(I[1]+E[1])/N)
+prob.c = 1 - exp(-rou*h)
+prob.d = 1 - exp(-gamma*h)
+B <- rbinom(1,size = S[1], prob = prob.b)
+C <- rbinom(1,size = E[1], prob = prob.c)
+D <- rbinom(1,size = I[1], prob = prob.d)
+
+t = 1
+
+while (E[t]+I[t]>0){
+  t = t+1
+  S = c(S, S[t-1] - B[t-1])
+  E = c(E, E[t-1] + B[t-1] - C[t-1])
+  I = c(I, I[t-1] + C[t-1]- D[t-1])
+  
+  if (t<t.star){
+    beta.t = beta
+  }  else{
+    beta.t = beta*exp(-q*(t-t.star))
+  }
+  
+  prob.b = 1 - exp(-beta.t*h*(I[t]+E[t])/N)
+  prob.c = 1 - exp(-rou*h)
+  prob.d = 1 - exp(-gamma*h)
+  B <- c(B, rbinom(1,size = S[t], prob = prob.b))
+  C <- c(C,rbinom(1,size = E[t], prob = prob.c))
+  D <- c(D, rbinom(1,size = I[t], prob = prob.d))
+}
+B.true = B
+E.true = E
+S.true = S
+beta.t.true = beta.t
+m = sum(B)
+m
+```
+
+
+
+
+
+####real data
+```{r}
+italy<-read.csv("D:\\courses\\RA-app\\GP\\WEEK9\\Italy.csv")
+C<-italy[, 2]
+D<-italy[, 9]
+I<-italy[, 10]
+
+C.prop<-read.csv("D:\\courses\\RA-app\\GP\\WEEK9\\C.csv")[-181,2]
+D.prop<-read.csv("D:\\courses\\RA-app\\GP\\WEEK9\\D.csv")[-181,2]
+I.prop=numeric(180)
+I.prop[1] = 0
+for (t in 2:180) {
+  I.prop[t] = I.prop[t-1] + C.prop[t-1]- D.prop[t-1]
+}
+T=180
+times = 1:T
+plot(x=times, y = C, xlab = 'day', ylab = ' new cases', type = 'l', col = 'blue', main = 'new cases', lwd = 2)
+lines(x=times, y = C.prop, col='red', lwd = 2, type = 'l')
+legend("topright", legend=c("Real new cases", "Estimated new cases"),
+       col=c("blue", "red" ), lty= c(1,1), lwd = c(2,2), cex=1.5)
+
+plot(x=times, y = D, xlab = 'day', ylab = 'removed cases', type = 'l', col = 'blue', main = 'removed cases', lwd = 2)
+lines(x=times, y = D.prop, col='red', lwd = 2, type = 'l')
+legend("topright", legend=c("Real removed cases", "Estimated removed cases"),
+       col=c("blue", "red" ), lty= c(1,1), lwd = c(2,2), cex=1.5)
+
+
+#m=italy[dim(italy)[1], 3]
+N<-60482200
+S = numeric(T)
+E = numeric(T)
+
+S[1] = N-3
+E[1] = 1
+for (i in (2:T)){
+      S[i] = S[i-1] - B[i-1]
+      E[i] = E[i-1] + B[i-1] - C[i-1]
+}
+  
+
+```
+
+###iterative
+```{r}
+###initialization 
+#B = numeric(T)
+#B[1]=m
+#B = B.true
+####probability for MH
+
+likelihood<- function(B1, S1, E1, theta, B2, S2, E2){#, T=100, t.star=t.star, h=1, N=500, I = I, C = C, D = D){
+  beta.t = numeric(T)
+   for (t in 1:T){
+   if (t<t.star){
+     beta.t[t] = theta[1]
+   }  else{
+     beta.t[t] = theta[1]*exp(-theta[2]*(t-t.star))
+   }
+   } 
+   prob = numeric(T)
+   for (j in (1:T)) {
+     prob[j] = log(dbinom(B1[j],size=S1[j],prob = (1 - exp(-beta.t[j]*h*(I[j]+E1[j])/N))))-log(dbinom(B2[j],size=S2[j],prob = (1 - exp(-beta.t[j]*h*(I[j]+E2[j])/N))))
+   }
+   
+   #prob[which(prob==0)] = 1
+   return(exp(sum(prob)))
+}
+
+f.theta<-function(B,S,E,theta1, theta2){#,h=1, N=500, C=C,D=D,I=I){
+  prior1 = prod(dgamma(theta1[-4],2,10))*dgamma(theta1[4],2,14)
+  prior2 = prod(dgamma(theta2[-4],2,10))*dgamma(theta2[4],2,14)
+  
+  beta.t1 = numeric(T)
+  beta.t2 = numeric(T)
+  for (t in 1:T){
+  if (t<t.star){
+    beta.t1[t] = theta1[1]
+    beta.t2[t] = theta2[1]
+  }  else{
+    beta.t1[t] = theta1[1]*exp(-theta1[2]*(t-t.star))
+    beta.t2[t] = theta2[1]*exp(-theta2[2]*(t-t.star))
+  }
+  } 
+
+  p = numeric(T)
+  for (j in (1:T)) {
+    p[j] = log(dbinom(B[j],size=S[j],prob = (1 - exp(-beta.t1[j]*h*(I[j]+E[j])/N)))*dbinom(C[j], size = E[j], prob = 1 - exp(-theta1[3]*h))*dbinom(D[j], size = I[j], prob = 1 - exp(-theta1[4]*h)))
+    p[j] = p[j]- log((dbinom(B[j],size=S[j],prob = (1 - exp(-beta.t2[j]*h*(I[j]+E[j])/N)))*dbinom(C[j], size = E[j], prob = 1 - exp(-theta2[3]*h))*dbinom(D[j], size = I[j], prob = 1 - exp(-theta2[4]*h))))
+  }
+  
+  #p[which(is.na(p)==TRUE)] = 1
+  return(exp(sum(p))*prior1/prior2)
+}
+
+
+##B.final = B
+
+theta = c(beta+rnorm(1,0,0.01),q+rnorm(1,0,0.01),rou+rnorm(1,0,0.05),gamma+rnorm(1,0,0.05))#c(rgamma(1, shape = 2, rate = 10 ),rgamma(1, shape = 2, rate = 10 ),rgamma(1, shape = 2, rate = 10 ),rgamma(1, shape = 2, rate = 14 ))
+theta.final = theta
+accep = 0
+accep.b = 0
+for (i in (1:20000)) {
+  ###update B
+  ###proposed B
+  B.prop = B
+  S.prop = S
+  E.prop = E
+  k=0
+  while (k==0 || length(which(E.prop<0))!=0){ #|| length(which(E.prop[-T]+I[-T]>0))<T-1 || E.prop[T]+I[T]!=0 ) {
+    k = k+1
+    B.prop = B
+    S.prop = S
+    E.prop = E
+    #cat("k ",k,"\n")
+    t.minus <- sample(which(B.prop>0),size=1)
+    B.prop[t.minus] = B.prop[t.minus] - 1
+    t.plus <- sample(1:T,1)
+    B.prop[t.plus] = B.prop[t.plus] + 1
+  ###corresponding S E
+    S.prop[1] = N-1
+    E.prop[1] = 1
+    for (i in (2:T)){
+      S.prop[i] = S.prop[i-1] - B.prop[i-1]
+      E.prop[i] = E.prop[i-1] + B.prop[i-1] - C[i-1]
+    }
+  }
+
+  #if (length(which(E.prop<0))==0 & length(which(E.prop[-T]+I[-T]<=0))==0 & E.prop[T]+I[T]==0 ){
+  if (length(which(C-E.prop>0))==0 ){
+    prop = min(1,likelihood(B1 = B.prop, S1 = S.prop, E1 = E.prop, theta=theta, B2 = B, S2 = S, E2 = E))
+    #cat("probability of first step ",prop,"\n")
+    if (runif(1)<prop){
+      B = B.prop
+      S = S.prop
+      E = E.prop
+      accep.b = accep.b + 1
+    }
+  } else{
+    B = B
+    S = S
+    E = E
+  }
+  
+  #B.final = rbind(B.final, B)
+  ## update theta
+  theta.prop = theta+c(rnorm(1,0,0.001),rnorm(1,0,0.001), rnorm(1,0,0.015),rnorm(1,0,0.015))
+  if (all(theta.prop>0)){
+    alpha = min(1,f.theta(B=B,S=S,E=E,theta1 = theta.prop,theta2 = theta))
+    #print(alpha)
+    if (runif(1)<alpha){
+      theta = theta.prop
+      accep = accep + 1
+    }
+  } else{
+    theta = theta
+  }
+  theta.final = rbind(theta.final, theta)
+}
+
+apply(theta.final[10000:20000,],2,mean)
+
+```
